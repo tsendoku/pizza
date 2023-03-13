@@ -1,9 +1,9 @@
 import React from 'react';
 import qs from 'qs';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { setCategoryId, setCurrentPage, setFilters } from '../redux/slices/filterSlice';
+import { fetchPizzas } from '../redux/slices/pizzaSlice';
 import { sortList } from '../components/Sorting';
 
 import Categories from '../components/Categories';
@@ -20,10 +20,9 @@ function Home() {
   const isMounted = React.useRef(false);
 
   const { categoryId, sort, currentPage } = useSelector((state) => state.filter);
+  const { items, status } = useSelector((state) => state.pizza);
 
   const { searchValue } = React.useContext(SearchContext);
-  const [items, setItems] = React.useState([]);
-  const [isLoading, setIsLoading] = React.useState(true);
 
   const onChangeCategory = (id) => {
     dispatch(setCategoryId(id));
@@ -46,21 +45,15 @@ function Home() {
     isMounted.current = true;
   }, [navigate, categoryId, sort.sortProperty, searchValue, currentPage]);
 
-  const fetchPizzas = () => {
-    setIsLoading(true);
-
+  const getPizzas = async () => {
     const order = sort.sortProperty.includes('-') ? 'asc' : 'desc';
     const sortBy = sort.sortProperty.replace('-', '');
     const category = categoryId > 0 ? `category=${categoryId}` : '';
     const search = searchValue ? `&search=${searchValue}` : '';
-    axios
-      .get(
-        `https://62fa2a57ffd7197707e6bbf0.mockapi.io/items?page=${currentPage}&limit=4&${category}&sortBy=${sortBy}&order=${order}${search}`,
-      )
-      .then((res) => {
-        setItems(res.data);
-        setIsLoading(false);
-      });
+
+    dispatch(fetchPizzas({ order, sortBy, category, search, currentPage }));
+
+    window.scrollTo(0, 0);
   };
   // If there was a render to check URL params and save it to Redux
   React.useEffect(() => {
@@ -83,7 +76,7 @@ function Home() {
     window.scrollTo(0, 0);
 
     if (!isSearch.current) {
-      fetchPizzas();
+      getPizzas();
     }
     isSearch.current = false;
     // eslint-disable-next-line
@@ -109,7 +102,14 @@ function Home() {
         <Sorting />
       </div>
       <h2 className="content__title">Все пиццы</h2>
-      <div className="content__items">{isLoading ? skeletons : pizzas}</div>
+      {status === 'error' ? (
+        <div className="content__error-info">
+          <h2>Произошла ошибка :(</h2>
+          <p>К сожалению не удалось получить пиццы. Попробуйте позже.</p>
+        </div>
+      ) : (
+        <div className="content__items">{status === 'loading' ? skeletons : pizzas}</div>
+      )}
       <Pagination currentPage={currentPage} onChangePage={onChangePage} />
     </>
   );
